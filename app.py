@@ -5,6 +5,9 @@ from utils.prompts import SYSTEM_PROMPT
 
 from services.agent import run_agent
 from services.student_service import get_all_students
+from tools.memory_tool import (
+    save_memory
+)
 
 
 # -------------------------
@@ -17,6 +20,22 @@ st.set_page_config(
     layout="wide"
 )
 
+
+
+# -------------------------
+# Memory Save Notification
+# -------------------------
+
+if "memory_saved" not in st.session_state:
+    st.session_state.memory_saved = False
+
+if st.session_state.get("memory_saved"):
+
+    st.success(
+        "✅ Session saved to memory."
+    )
+
+    st.session_state.memory_saved = False
 # -------------------------
 # Custom CSS
 # -------------------------
@@ -112,6 +131,32 @@ with st.sidebar:
         • General Knowledge
         """)
 
+    st.divider()
+
+    if st.button(
+        "End Session"
+    ):
+
+        if st.session_state.messages:
+
+            conversation_text = ""
+
+            for msg in st.session_state.messages:
+
+                conversation_text += (
+                    f"{msg['role']}: "
+                    f"{msg['content']}\n\n"
+                )
+
+            save_memory(
+                student_id=selected_student,
+                conversation=conversation_text
+            )
+
+            st.session_state.messages = []
+            st.session_state.memory_saved = True
+
+            st.rerun()
 # -------------------------
 # Session State
 # -------------------------
