@@ -1,5 +1,6 @@
 import chromadb
 from rag.ingest import build_knowledge_base
+import os
 
 from sentence_transformers import (
     SentenceTransformer
