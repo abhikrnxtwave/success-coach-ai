@@ -9,6 +9,10 @@ from tools.knowledge_tool import (
     get_knowledge_context
 )
 
+from tools.memory_tool import (
+    search_memory
+)
+
 
 def decide_tools(user_query):
 
@@ -34,6 +38,13 @@ Available tools:
    - concepts
    - syllabus content
 
+4. memory
+   - previous discussions
+   - student history
+   - progress
+   - habits
+   - recurring struggles
+
 Return ONLY one of:
 
 student_identity
@@ -43,6 +54,14 @@ both
 none
 
 Rules:
+
+Use memory when:
+
+- asking about previous sessions
+- asking for progress
+- asking what happened before
+- asking about recurring challenges
+- asking for coaching continuity
 
 - Greetings, introductions, casual conversation,
   "who am I", "who is the selected student"
@@ -122,6 +141,23 @@ def run_agent(
 
     student_context = ""
     knowledge_context = ""
+    memory_context = ""
+
+    #for memory
+    memory_context = ""
+
+    try:
+
+        memory_context = search_memory(
+            query,
+            student_name
+        )
+
+    except Exception as e:
+
+        print(
+            f"Memory Tool Error: {e}"
+        )
 
     # -------------------------
     # Student Identity Tool
@@ -192,5 +228,6 @@ def run_agent(
     return {
         "decision": decision,
         "student_context": student_context,
-        "knowledge_context": knowledge_context
+        "knowledge_context": knowledge_context,
+        "memory_context": memory_context
     }

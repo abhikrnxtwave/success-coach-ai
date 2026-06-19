@@ -5,6 +5,15 @@ from utils.prompts import SYSTEM_PROMPT
 
 from services.agent import run_agent
 from services.student_service import get_all_students
+
+from services.memory_summarizer import (
+    generate_memory_objects
+)
+
+from utils.memory_parser import (
+    split_memory
+)
+
 from tools.memory_tool import (
     save_memory
 )
@@ -148,9 +157,18 @@ with st.sidebar:
                     f"{msg['content']}\n\n"
                 )
 
+            memory_text = generate_memory_objects(
+                conversation_text
+            )
+
+            facts, summary = split_memory(
+                memory_text
+            )
+
             save_memory(
                 student_id=selected_student,
-                conversation=conversation_text
+                factual_memory=facts,
+                session_summary=summary
             )
 
             st.session_state.messages = []
@@ -226,8 +244,8 @@ if prompt:
                 agent_result["knowledge_context"]
             )
 
-            tool_decision = (
-                agent_result["decision"]
+            memory_context = (
+                agent_result["memory_context"]
             )
 
             # -------------------------
@@ -240,10 +258,7 @@ if prompt:
                     "content": SYSTEM_PROMPT
                 }
             ]
-
-            # -------------------------
             # Student Context
-            # -------------------------
 
             if student_context:
 
@@ -254,10 +269,8 @@ if prompt:
                     }
                 )
 
-            # -------------------------
             # Knowledge Context
-            # -------------------------
-
+            
             if knowledge_context:
 
                 messages.append(
@@ -274,6 +287,31 @@ Instructions:
 - Prefer knowledge base information over general knowledge.
 - If the context is not relevant, answer normally.
 """
+                    }
+                )
+
+            if memory_context:
+
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": f"""
+            Student Historical Memory:
+
+            {memory_context}
+
+            IMPORTANT:
+
+            - These memories belong to the currently selected student.
+            - Use them as factual context.
+            - If the user asks about hobbies, goals,
+            preferences, struggles, progress,
+            previous discussions or habits,
+            answer using these memories.
+            - Do not say you do not know if the answer
+            exists in the memories.
+            - Do not mention memory retrieval.
+            """
                     }
                 )
 
