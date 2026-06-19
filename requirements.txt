@@ -3,3 +3,6 @@ openai
 python-dotenv
 gspread
 google-auth
+langchain
+langchain-openai
+langsmith
