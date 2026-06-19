@@ -1,233 +1,134 @@
-from config.llm import get_ai_response
+from langchain_core.tools import tool
+
+from config.llm import llm
 
 from tools.student_tool import (
     get_student_context,
     get_student_identity
 )
-
 from tools.knowledge_tool import (
     get_knowledge_context
 )
-
 from tools.memory_tool import (
     search_memory
 )
 
 
-def decide_tools(user_query):
+ROUTER_SYSTEM_PROMPT = """You are the routing layer for a Student Success AI coach.
 
-    planner_prompt = f"""
-You are an AI routing agent.
+Look at the user's message and call whichever tools are needed to
+gather context for answering it. You may call more than one tool
+if the question genuinely needs more than one kind of context.
+Call no tools for general questions unrelated to the student,
+their coursework, or past sessions.
 
-Available tools:
-
-1. student_identity
-   - greetings
-   - introductions
-   - personal conversation
-   - who is the selected student
-
-2. student_data
-   - scores
-   - attendance
-   - exams
-   - performance
-
-3. knowledge_base
-   - study topics
-   - concepts
-   - syllabus content
-
-4. memory
-   - previous discussions
-   - student history
-   - progress
-   - habits
-   - recurring struggles
-
-Return ONLY one of:
-
-student_identity
-student_data
-knowledge_base
-both
-none
-
-Rules:
-
-Use memory when:
-
-- asking about previous sessions
-- asking for progress
-- asking what happened before
-- asking about recurring challenges
-- asking for coaching continuity
-
-- Greetings, introductions, casual conversation,
-  "who am I", "who is the selected student"
-  -> student_identity
-
-- Student performance, attendance, scores, exams
-  -> student_data
-
-- Study topics, concepts, syllabus content
-  -> knowledge_base
-
-- Questions needing both student information
-  and study information
-  -> both
-
-- Completely unrelated general questions
-  -> none
-
-Return ONLY the routing value.
-
-Do not explain.
-Do not add punctuation.
-
-Question:
-{user_query}
-"""
-
-    try:
-        response = get_ai_response(
-            [
-                {
-                    "role": "user",
-                    "content": planner_prompt
-                }
-            ]
-        )
-
-        decision = response.strip().lower()
-
-        valid_decisions = [
-            "student_identity",
-            "student_data",
-            "knowledge_base",
-            "both",
-            "none"
-        ]
-
-        for value in valid_decisions:
-
-            if decision == value:
-                return value
-
-        for value in valid_decisions:
-
-            if value in decision:
-                return value
-
-        return "none"
-
-    except Exception as e:
-
-        print(
-            f"Agent Planner Error: {e}"
-        )
-
-        return "none"
+Do not answer the user. Only decide which tools to call."""
 
 
-def run_agent(
-    query,
-    student_name
-):
+def build_tools(query, student_name):
+    """
+    Wraps each context source as a zero-argument LangChain tool.
 
-    decision = decide_tools(
-        query
-    )
+    student_name and query are captured via closure rather than
+    exposed as tool arguments, since they're already known values —
+    the model's only job is picking the right tool(s), not inventing
+    arguments for them.
 
-    student_context = ""
-    knowledge_context = ""
-    memory_context = ""
+    Memory is deliberately NOT one of these tools — see run_agent().
+    """
 
-    #for memory
+    @tool
+    def get_identity_info() -> str:
+        """Use for greetings, introductions, casual small talk,
+        or when the user asks who the currently selected student is.
+        Do not use this for performance, scores, or attendance questions."""
+        return get_student_identity(student_name)
+
+    @tool
+    def get_performance_data() -> str:
+        """Use when the user asks about the student's attendance,
+        exam scores, grades, performance trends, or upcoming exams."""
+        return get_student_context(student_name)
+
+    @tool
+    def search_knowledge_base() -> str:
+        """Use for study-related questions: subject concepts,
+        syllabus content, definitions, or how a topic works."""
+        return get_knowledge_context(query)
+
+    return [
+        get_identity_info,
+        get_performance_data,
+        search_knowledge_base,
+    ]
+
+
+# Maps each tool name to the context bucket it fills in
+# run_agent's return value. Add an entry here whenever you add a tool.
+TOOL_TO_CONTEXT_KEY = {
+    "get_identity_info": "student_context",
+    "get_performance_data": "student_context",
+    "search_knowledge_base": "knowledge_context",
+}
+
+
+def run_agent(query, student_name):
+
     memory_context = ""
 
     try:
-
-        memory_context = search_memory(
-            query,
-            student_name
-        )
-
+        memory_context = search_memory(query, student_name)
     except Exception as e:
+        print(f"Memory Tool Error: {e}")
 
-        print(
-            f"Memory Tool Error: {e}"
-        )
+    tools = build_tools(query, student_name)
+    tool_lookup = {t.name: t for t in tools}
 
-    # -------------------------
-    # Student Identity Tool
-    # -------------------------
+    llm_with_tools = llm.bind_tools(tools)
 
-    if decision == "student_identity":
+    try:
+        routing_decision = llm_with_tools.invoke([
+            {"role": "system", "content": ROUTER_SYSTEM_PROMPT},
+            {"role": "user", "content": query},
+        ])
+        tool_calls = routing_decision.tool_calls or []
+    except Exception as e:
+        print(f"Agent Routing Error: {e}")
+        tool_calls = []
 
-        try:
+    context = {
+        "student_context": "",
+        "knowledge_context": "",
+    }
 
-            student_context = (
-                get_student_identity(
-                    student_name
-                )
-            )
+    called_tools = []
 
-        except Exception as e:
+    for call in tool_calls:
 
-            print(
-                f"Student Identity Tool Error: {e}"
-            )
+        tool_name = call["name"]
+        matched_tool = tool_lookup.get(tool_name)
 
-    # -------------------------
-    # Student Data Tool
-    # -------------------------
-
-    elif decision in [
-        "student_data",
-        "both"
-    ]:
+        if not matched_tool:
+            continue
 
         try:
-
-            student_context = (
-                get_student_context(
-                    student_name
-                )
-            )
-
+            result = matched_tool.invoke(call.get("args", {}))
         except Exception as e:
+            print(f"Tool Execution Error ({tool_name}): {e}")
+            continue
 
-            print(
-                f"Student Tool Error: {e}"
-            )
+        context_key = TOOL_TO_CONTEXT_KEY[tool_name]
 
-    # -------------------------
-    # Knowledge Tool
-    # -------------------------
+        if context[context_key]:
+            context[context_key] += "\n\n" + result
+        else:
+            context[context_key] = result
 
-    if decision in [
-        "knowledge_base",
-        "both"
-    ]:
-
-        try:
-
-            knowledge_context = (
-                get_knowledge_context(
-                    query
-                )
-            )
-
-        except Exception as e:
-
-            print(
-                f"Knowledge Tool Error: {e}"
-            )
+        called_tools.append(tool_name)
 
     return {
-        "decision": decision,
-        "student_context": student_context,
-        "knowledge_context": knowledge_context,
-        "memory_context": memory_context
+        "decision": called_tools or ["none"],
+        "student_context": context["student_context"],
+        "knowledge_context": context["knowledge_context"],
+        "memory_context": memory_context,
     }
