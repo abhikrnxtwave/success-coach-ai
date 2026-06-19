@@ -6,7 +6,8 @@ google-auth
 langchain
 langchain-openai
 langsmith
-chromadb
+chromadb==0.5.5
 sentence-transformers
 torch 
 torchvision
+protobuf==3.20.3
