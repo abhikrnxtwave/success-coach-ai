@@ -4,6 +4,9 @@ from pathlib import Path
 import chromadb
 from sentence_transformers import SentenceTransformer
 
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter
+)
 
 def build_knowledge_base():
 
@@ -19,6 +22,13 @@ def build_knowledge_base():
         name="knowledge_base"
     )
 
+    splitter = (
+        RecursiveCharacterTextSplitter(
+            chunk_size=500,
+            chunk_overlap=100
+        )
+    )
+
     knowledge_dir = Path("knowledge")
 
     for file in knowledge_dir.glob("*.md"):
@@ -27,15 +37,23 @@ def build_knowledge_base():
             encoding="utf-8"
         )
 
-        embedding = model.encode(
+        chunks = splitter.split_text(
             text
-        ).tolist()
-
-        collection.add(
-            ids=[file.stem],
-            documents=[text],
-            embeddings=[embedding]
         )
+
+        for i, chunk in enumerate(
+            chunks
+        ):
+
+            embedding = model.encode(
+                text
+            ).tolist()
+
+            collection.add(
+                ids=[file.stem],
+                documents=[text],
+                embeddings=[embedding]
+            )
 
     print("Knowledge Base Indexed")
 
