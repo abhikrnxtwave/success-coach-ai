@@ -50,32 +50,15 @@ def save_memory(
 
 
 
-def search_memory(
-    query,
-    student_id
-):
+def search_memory(query, student_id):
 
     results = memory.search(
         query=query,
-        filters={
-            "user_id": student_id
-        }
+        user_id=student_id
     )
-
     memory_text = ""
 
-    memories = results.get(
-        "results",
-        []
-    )
-
-    for item in memories:
-
-        memory_text += (
-            item.get(
-                "memory",
-                ""
-            ) + "\n"
-        )
+    for item in results:
+        memory_text += item.get("memory", "") + "\n"
 
     return memory_text
