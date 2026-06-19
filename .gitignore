@@ -14,9 +14,14 @@ __pycache__/
 # macOS
 .DS_Store
 
+# ChromaDB (optional - rebuild on startup)
+chroma_db/
+
 # IDE
 .vscode/
 .idea/
+# Logs
+*.log
 
 # Testing
 .pytest_cache/

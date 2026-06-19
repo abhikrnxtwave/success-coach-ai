@@ -2,6 +2,7 @@ import streamlit as st
 
 from config.llm import get_ai_response
 from utils.prompts import SYSTEM_PROMPT
+from rag.retriever import retrieve_context
 
 from services.student_service import (
     get_all_students,
@@ -251,6 +252,12 @@ along with the average attendance percentage.
 Use student data whenever relevant.
 For general knowledge questions, answer normally.
 """
+            
+            #rag part
+            knowledge_context = retrieve_context(
+                prompt
+            )
+
 
             # -------------------------
             # Build Messages
@@ -264,6 +271,20 @@ For general knowledge questions, answer normally.
                 {
                     "role": "system",
                     "content": student_context
+                },
+                {
+                    "role": "system",
+                    "content": f"""
+            Knowledge Base Context:
+
+            {knowledge_context}
+
+            Instructions:
+
+            - Use the knowledge base context for study-related questions.
+            - Prefer knowledge base information over general knowledge.
+            - If no relevant knowledge exists, answer normally.
+            """
                 }
             ]
 
@@ -284,6 +305,8 @@ For general knowledge questions, answer normally.
             "content": response
         }
     )
+
+    
 
 # -------------------------
 # Footer

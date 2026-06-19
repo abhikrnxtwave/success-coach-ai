@@ -6,3 +6,7 @@ google-auth
 langchain
 langchain-openai
 langsmith
+chromadb
+sentence-transformers
+torch 
+torchvision
