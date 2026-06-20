@@ -55,8 +55,6 @@ def build_knowledge_base():
                 embeddings=[embedding]
             )
 
-    print("Knowledge Base Indexed")
-
 
 if __name__ == "__main__":
     build_knowledge_base()

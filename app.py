@@ -15,9 +15,13 @@ from utils.memory_parser import (
 )
 
 from tools.memory_tool import (
-    save_memory
+    save_memory,
+    search_memory
 )
 
+from graphs.signal_graph import (
+    run_signal_workflow
+)
 
 # -------------------------
 # Page Config
@@ -170,6 +174,26 @@ with st.sidebar:
                 factual_memory=facts,
                 session_summary=summary
             )
+
+            historical_memory = search_memory(
+                query=summary,
+                student_id=selected_student
+            )
+
+            # -------------------------
+            # Signal Detection
+            # -------------------------
+
+            signal_result = run_signal_workflow(
+                student_id=selected_student,
+                session_summary=summary,
+                memory_context=historical_memory
+            )
+
+            ## print(signal_result) // printing signal result
+
+            st.session_state.latest_signal = signal_result
+            
 
             st.session_state.messages = []
             st.session_state.memory_saved = True

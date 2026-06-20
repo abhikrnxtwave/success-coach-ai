@@ -27,3 +27,11 @@ client = gspread.authorize(creds)
 spreadsheet = client.open_by_key(
     os.getenv("GOOGLE_SHEET_ID") or st.secrets["GOOGLE_SHEET_ID"]
 )
+
+def get_sheet(
+    worksheet_name
+):
+
+    return spreadsheet.worksheet(
+        worksheet_name
+    )
