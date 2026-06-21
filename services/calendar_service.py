@@ -1,10 +1,13 @@
 import os
-
 from datetime import datetime, timedelta
 
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
+try:
+    import streamlit as st
+except ImportError:
+    st = None
 
 
 CALENDAR_ID = os.getenv("CALENDAR_ID")
@@ -13,10 +16,27 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar"
 ]
 
-creds = Credentials.from_service_account_file(
-    "credentials.json",
-    scopes=SCOPES
-)
+
+def get_credentials():
+
+    # Streamlit Cloud
+    if st:
+        try:
+            return Credentials.from_service_account_info(
+                st.secrets["gcp_service_account"],
+                scopes=SCOPES
+            )
+        except Exception:
+            pass
+
+    # Local
+    return Credentials.from_service_account_file(
+        "credentials.json",
+        scopes=SCOPES
+    )
+
+
+creds = get_credentials()
 
 calendar_service = build(
     "calendar",
