@@ -5,6 +5,11 @@ from services.signal_reader import (
     get_signals
 )
 
+
+from graphs.planning_graph import (
+    run_planning_workflow
+)
+
 # ----------------------------------
 # Page Title
 # ----------------------------------
@@ -17,6 +22,13 @@ st.set_page_config(
 
 st.title(
     "🎓 Coach Dashboard"
+)
+# ----------------------------------
+# Sidebar
+# ----------------------------------
+
+st.sidebar.title(
+    "📅 Calendar Events"
 )
 
 # ----------------------------------
@@ -38,21 +50,19 @@ df = pd.DataFrame(signals)
 # ----------------------------------
 # Metrics
 # ----------------------------------
-
 critical_count = 0
-high_count = 0
-pending_count = 0
+manager_alerts = 0
 
 for row in signals:
 
-    severity = (
+    severity = str(
         row.get(
             "severity",
             ""
-        ).upper()
-    )
+        )
+    ).upper()
 
-    actioned = (
+    actioned = str(
         row.get(
             "actioned",
             ""
@@ -63,13 +73,22 @@ for row in signals:
 
         critical_count += 1
 
-    elif "HIGH" in severity:
+    if actioned == "Manager Notified":
 
-        high_count += 1
+        manager_alerts += 1
 
-    if actioned != "Done":
+planned_today = 0
 
-        pending_count += 1
+if "today_plan" in st.session_state:
+
+    planned_today = len(
+        st.session_state[
+            "today_plan"
+        ].get(
+            "planned_sessions",
+            []
+        )
+    )
 
 col1, col2, col3 = st.columns(3)
 
@@ -83,31 +102,186 @@ with col1:
 with col2:
 
     st.metric(
-        "⚠️ High",
-        high_count
+        "📅 Planned Today",
+        planned_today
     )
 
 with col3:
 
     st.metric(
-        "📋 Pending",
-        pending_count
+        "🔴 Manager Alerts",
+        manager_alerts
     )
 
+
 # ----------------------------------
-# Full Signal Table
+# AI Daily Plan
 # ----------------------------------
 
-# st.divider()
+st.divider()
 
-# st.subheader(
-#     "📊 All Signals"
-# )
+st.header(
+    "📅 AI Daily Coaching Plan"
+)
 
-# st.dataframe(
-#     df,
-#     use_container_width=True
-# )
+if st.button(
+    "🚀 Generate Today's Plan",
+    use_container_width=True
+):
+
+    plan = run_planning_workflow()
+
+    st.session_state[
+        "today_plan"
+    ] = plan
+
+
+# ----------------------------------
+# Default Values
+# ----------------------------------
+
+planned_sessions = []
+deferred_students = []
+calendar_events = []
+
+
+if "today_plan" in st.session_state:
+
+    plan = st.session_state[
+        "today_plan"
+    ]
+
+    planned_sessions = plan.get(
+        "planned_sessions",
+        []
+    )
+
+    deferred_students = plan.get(
+        "deferred_students",
+        []
+    )
+
+    calendar_events = plan.get(
+        "calendar_events",
+        []
+    )
+
+
+
+# ----------------------------------
+# Sidebar Calendar Events
+# ----------------------------------
+
+if calendar_events:
+
+    st.sidebar.success(
+        f"{len(calendar_events)} Events Created"
+    )
+
+    for event in calendar_events:
+
+        st.sidebar.markdown(
+            f"""
+### 📅 {event['title']}
+
+🕘 {event['start_time']}
+
+⏱ {event['duration']} mins
+"""
+        )
+
+        if event.get(
+            "event_link"
+        ):
+
+            st.sidebar.markdown(
+                f"[Open Event]({event['event_link']})"
+            )
+
+        st.sidebar.divider()
+
+else:
+
+    st.sidebar.info(
+        "Generate today's plan to create calendar events."
+    )
+
+
+
+
+# ----------------------------------
+# Coach Schedule
+# ----------------------------------
+
+if "today_plan" in st.session_state:
+
+    st.subheader(
+        "🗓 Coach Schedule"
+    )
+
+    if not planned_sessions:
+
+        st.info(
+            "No students require coaching today."
+        )
+
+    else:
+
+        for session in planned_sessions:
+
+            with st.container(
+                border=True
+            ):
+
+                st.markdown(
+                    f"""
+## 🕘 {session['time']}
+
+### 👨‍🎓 {session['student_id']}
+
+**🎯 Session Type:** {session['session_type']}
+
+**⚠️ Severity:** {session['severity']}
+
+**📌 Signal:** {session['signal_type']}
+
+**⏱ Duration:** {session['duration']} mins
+"""
+                )
+
+                st.info(
+                    session["reason"]
+                )
+
+    st.divider()
+
+    st.subheader(
+        "⏳ Deferred To Tomorrow"
+    )
+
+    if not deferred_students:
+
+        st.success(
+            "No deferred students."
+        )
+
+    else:
+
+        for student in deferred_students:
+
+            with st.container(
+                border=True
+            ):
+
+                st.warning(
+                    f"""
+👨‍🎓 {student['student_id']}
+
+Reason:
+{student['reason']}
+"""
+                )
+    
 
 # ----------------------------------
 # Critical Signals
@@ -161,95 +335,6 @@ if not critical_found:
 
     st.success(
         "No critical signals."
-    )
-
-# ----------------------------------
-# High Priority Signals
-# ----------------------------------
-
-st.divider()
-
-st.header(
-    "⚠️ High Priority Signals"
-)
-
-high_found = False
-
-for row in signals:
-
-    severity = (
-        row.get(
-            "severity",
-            ""
-        ).upper()
-    )
-
-    if "HIGH" in severity:
-
-        high_found = True
-
-        with st.expander(
-            f"{row.get('student_id')} | {row.get('signal_type')}"
-        ):
-
-            st.write(
-                f"Severity: {row.get('severity')}"
-            )
-
-            st.write(
-                f"Urgency: {row.get('urgency')}"
-            )
-
-            st.write(
-                f"Action Status: {row.get('actioned')}"
-            )
-
-            st.write(
-                row.get(
-                    "reason",
-                    ""
-                )
-            )
-
-if not high_found:
-
-    st.success(
-        "No high priority signals."
-    )
-
-# ----------------------------------
-# Requires Action Today
-# ----------------------------------
-
-st.divider()
-
-st.header(
-    "⏰ Requires Action Today"
-)
-
-today_found = False
-
-for row in signals:
-
-    urgency = (
-        row.get(
-            "urgency",
-            ""
-        ).upper()
-    )
-
-    if "TODAY" in urgency:
-
-        today_found = True
-
-        st.error(
-            f"{row.get('student_id')} | {row.get('signal_type')}"
-        )
-
-if not today_found:
-
-    st.success(
-        "No urgent follow-ups today."
     )
 
 # ----------------------------------
@@ -308,58 +393,4 @@ if not manager_found:
 
     st.success(
         "No manager alerts."
-    )
-
-# ----------------------------------
-# Pending Follow-Ups
-# ----------------------------------
-
-st.divider()
-
-st.header(
-    "📋 Pending Follow-Ups"
-)
-
-pending_found = False
-
-for row in signals:
-
-    actioned = (
-        row.get(
-            "actioned",
-            ""
-        )
-    )
-
-    if actioned != "Done":
-
-        pending_found = True
-
-        with st.expander(
-            f"{row.get('student_id')} | {row.get('signal_type')}"
-        ):
-
-            st.write(
-                f"Severity: {row.get('severity')}"
-            )
-
-            st.write(
-                f"Urgency: {row.get('urgency')}"
-            )
-
-            st.write(
-                f"Current Status: {actioned}"
-            )
-
-            st.write(
-                row.get(
-                    "reason",
-                    ""
-                )
-            )
-
-if not pending_found:
-
-    st.success(
-        "No pending follow-ups."
     )

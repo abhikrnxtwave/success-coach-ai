@@ -263,27 +263,14 @@ def run_signal_workflow(
     # Save Signal
     # --------------------------------
 
-    save_signal(
-        student_id=student_id,
-        signal_type=signal_type,
-        severity=severity,
-        urgency=urgency,
-        reason=session_summary
-    )
-
-    # --------------------------------
-    # Manager Alert
-    # --------------------------------
-
-    if (
-        severity == "CRITICAL"
-        and manager_notify == "YES"
-    ):
-
-        print("\n======================")
-        print("🚨 MANAGER ALERT")
-        print("======================")
-        print(escalation_summary)
+    if signal_type != "NONE":
+        save_signal(
+            student_id=student_id,
+            signal_type=signal_type,
+            severity=severity,
+            urgency=urgency,
+            reason=session_summary
+        )
 
     return {
         "student_id": student_id,
