@@ -7,7 +7,8 @@ from services.signal_reader import (
 
 
 from graphs.planning_graph import (
-    run_planning_workflow
+    run_planning_workflow,
+    resolve_critical_conflict
 )
 
 
@@ -60,8 +61,6 @@ df = pd.DataFrame(signals)
 # ----------------------------------
 critical_count = 0
 
-critical_count = 0
-
 for row in signals:
 
     severity = str(
@@ -107,31 +106,6 @@ with col2:
     )
 
 
-
-# ----------------------------------
-# AI Daily Plan
-# ----------------------------------
-
-st.divider()
-
-st.header(
-    "📅 AI Daily Coaching Plan"
-)
-
-if st.button(
-    "🚀 Generate Today's Plan",
-    use_container_width=True
-):
-
-    plan = run_planning_workflow()
-
-    st.session_state[
-        "today_plan"
-    ] = plan
-
-    st.rerun()
-
-
 # ----------------------------------
 # Default Values
 # ----------------------------------
@@ -139,6 +113,8 @@ if st.button(
 planned_sessions = []
 deferred_students = []
 calendar_events = []
+plan_summary = []
+critical_conflicts = []
 
 
 if "today_plan" in st.session_state:
@@ -162,6 +138,197 @@ if "today_plan" in st.session_state:
         []
     )
 
+    plan_summary = plan.get(
+        "plan_summary",
+        []
+    )
+
+    critical_conflicts = plan.get(
+        "critical_conflicts",
+        []
+    )
+
+
+# ----------------------------------
+# Plan Updates
+# (top of dashboard — coach sees what
+#  changed before opening anything else)
+# ----------------------------------
+
+if plan_summary:
+
+    st.header("🔄 Plan Updates")
+
+    for item in plan_summary:
+
+        message = item.get(
+            "message",
+            item.get("reason", "")
+        )
+
+        item_type = item.get("type")
+
+        if item_type == "NEW_SERIOUS_CONCERN":
+
+            st.error(f"🚨 {message}")
+
+        elif item_type == "MOVED_TO_TOMORROW":
+
+            st.warning(f"⏳ {message}")
+
+        elif item_type == "DEFERRED":
+
+            st.info(f"📅 {message}")
+
+        elif item_type == "RESCHEDULED":
+
+            st.info(f"🔁 {message}")
+
+        elif item_type == "COACH_DECISION_REQUIRED":
+
+            st.error(f"⚠️ {message}")
+
+        elif item_type == "COACH_DECISION_MADE":
+
+            st.success(f"✅ {message}")
+
+        else:
+
+            st.info(message)
+
+    st.divider()
+
+
+# ----------------------------------
+# Coach Decision Required
+# (Scenario 3 — biggest M9 feature)
+# ----------------------------------
+
+if critical_conflicts:
+
+    st.header("⚠️ Coach Decision Required")
+
+    if len(critical_conflicts) == 1:
+
+        st.warning(
+            "A CRITICAL student needs coaching but today's capacity is full. "
+            "Please decide how to proceed."
+        )
+
+    else:
+
+        st.warning(
+            "Multiple CRITICAL students need coaching but only limited capacity "
+            "remains today. Please decide who should be prioritized."
+        )
+
+    for student in critical_conflicts:
+
+        with st.container(border=True):
+
+            st.markdown(
+                f"""
+### 👨‍🎓 {student['student_id']}
+
+Severity:
+{student['severity']}
+
+Signal:
+{student['signal_type']}
+
+Reason:
+{student['reason']}
+"""
+            )
+
+            schedule_key = (
+                f"schedule_btn_{student['student_id']}"
+            )
+
+            if st.button(
+                f"Schedule {student['student_id']}",
+                key=schedule_key
+            ):
+
+                others = [
+                    s for s in critical_conflicts
+                    if s["student_id"] != student["student_id"]
+                ]
+
+                (
+                    scheduled_session,
+                    event,
+                    newly_deferred,
+                    summary_item
+                ) = resolve_critical_conflict(
+                    student,
+                    others
+                )
+
+                updated_plan = st.session_state.get(
+                    "today_plan",
+                    {}
+                )
+
+                updated_plan["planned_sessions"] = (
+                    updated_plan.get("planned_sessions", [])
+                    + [scheduled_session]
+                )
+
+                updated_plan["calendar_events"] = (
+                    updated_plan.get("calendar_events", [])
+                    + [event]
+                )
+
+                updated_plan["deferred_students"] = (
+                    updated_plan.get("deferred_students", [])
+                    + newly_deferred
+                )
+
+                updated_plan["plan_summary"] = (
+                    updated_plan.get("plan_summary", [])
+                    + [summary_item]
+                )
+
+                updated_plan["critical_conflicts"] = []
+
+                st.session_state["today_plan"] = updated_plan
+
+                st.rerun()
+
+    st.divider()
+
+
+# ----------------------------------
+# AI Daily Plan
+# ----------------------------------
+
+st.header(
+    "📅 AI Daily Coaching Plan"
+)
+
+if st.button(
+    "🚀 Generate Today's Plan",
+    use_container_width=True
+):
+
+    previous_sessions = st.session_state.get(
+        "today_plan",
+        {}
+    ).get(
+        "planned_sessions",
+        []
+    )
+
+    plan = run_planning_workflow(
+        previous_sessions=previous_sessions
+    )
+
+    st.session_state[
+        "today_plan"
+    ] = plan
+
+    st.rerun()
 
 
 # ----------------------------------
@@ -201,8 +368,6 @@ else:
     st.sidebar.info(
         "Generate today's plan to create calendar events."
     )
-
-
 
 
 # ----------------------------------
