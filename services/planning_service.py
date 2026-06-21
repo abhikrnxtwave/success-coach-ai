@@ -15,7 +15,6 @@ SEVERITY_ORDER = {
     "LOW": 1
 }
 
-
 def get_pending_signals():
 
     sheet = spreadsheet.worksheet(
@@ -28,38 +27,30 @@ def get_pending_signals():
 
     for row in rows:
 
-        urgency = str(
-            row.get(
-                "urgency",
-                ""
-            )
-        ).upper()
-
         actioned = str(
             row.get(
                 "actioned",
                 ""
             )
-        )
+        ).strip()
 
         signal_type = str(
             row.get(
                 "signal_type",
                 ""
             )
-        ).upper()
+        ).strip().upper()
 
         severity = str(
             row.get(
                 "severity",
                 ""
             )
-        ).upper()
+        ).strip().upper()
 
-        # Only signals that need coach attention TODAY
         if (
-            urgency == "TODAY"
-            and actioned != "Done"
+            actioned != "Done"
+            and signal_type != ""
             and signal_type != "NONE"
         ):
 
@@ -70,9 +61,7 @@ def get_pending_signals():
                 )
             )
 
-            pending.append(
-                row
-            )
+            pending.append(row)
 
     pending = sorted(
         pending,
@@ -80,7 +69,18 @@ def get_pending_signals():
         reverse=True
     )
 
+    # print("\n===== PENDING SIGNALS =====")
+
+    # for p in pending:
+    #     print(
+    #         p["student_id"],
+    #         p["severity"],
+    #         p["urgency"]
+    #     )
+
     return pending
+
+
 
 
 def assign_time_slots(

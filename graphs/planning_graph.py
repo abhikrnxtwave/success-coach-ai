@@ -37,9 +37,19 @@ class PlanningState(TypedDict):
 
 def load_signals_node(state):
 
-    state["signals"] = (
-        get_pending_signals()
-    )
+    signals = get_pending_signals()
+
+    # print("\n===== SIGNALS LOADED =====")
+
+    # for s in signals:
+
+    #     print(
+    #         s.get("student_id"),
+    #         s.get("severity"),
+    #         s.get("urgency")
+    #     )
+
+    state["signals"] = signals
 
     return state
 
@@ -82,6 +92,20 @@ def planning_node(state):
 
     for signal in signals:
 
+        severity = str(
+            signal.get(
+                "severity",
+                ""
+            )
+        ).upper()
+
+        urgency = str(
+            signal.get(
+                "urgency",
+                ""
+            )
+        ).upper()
+
         session_type = (
             recommend_session_type(
                 signal["signal_type"],
@@ -116,6 +140,31 @@ def planning_node(state):
             "reason":
             signal["reason"]
         }
+
+        # --------------------------------
+        # HIGH / MEDIUM / LOW TOMORROW
+        # --------------------------------
+
+        if (
+            severity != "CRITICAL"
+            and urgency == "TOMORROW"
+        ):
+
+            deferred.append(
+                {
+                    "student_id":
+                    signal["student_id"],
+
+                    "reason":
+                    "Recommended for tomorrow"
+                }
+            )
+
+            continue
+
+        # --------------------------------
+        # Schedule Today
+        # --------------------------------
 
         if duration <= remaining_minutes:
 

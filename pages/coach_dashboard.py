@@ -10,6 +10,14 @@ from graphs.planning_graph import (
     run_planning_workflow
 )
 
+
+
+from graphs.brief_graph import (
+    run_brief_workflow
+)
+
+
+
 # ----------------------------------
 # Page Title
 # ----------------------------------
@@ -51,7 +59,8 @@ df = pd.DataFrame(signals)
 # Metrics
 # ----------------------------------
 critical_count = 0
-manager_alerts = 0
+
+critical_count = 0
 
 for row in signals:
 
@@ -62,35 +71,26 @@ for row in signals:
         )
     ).upper()
 
-    actioned = str(
-        row.get(
-            "actioned",
-            ""
-        )
-    )
-
     if "CRITICAL" in severity:
 
         critical_count += 1
 
-    if actioned == "Manager Notified":
-
-        manager_alerts += 1
 
 planned_today = 0
 
 if "today_plan" in st.session_state:
 
     planned_today = len(
-        st.session_state[
-            "today_plan"
-        ].get(
-            "planned_sessions",
-            []
-        )
+    st.session_state.get(
+        "today_plan",
+        {}
+    ).get(
+        "planned_sessions",
+        []
     )
+)
 
-col1, col2, col3 = st.columns(3)
+col1, col2= st.columns(2)
 
 with col1:
 
@@ -106,12 +106,6 @@ with col2:
         planned_today
     )
 
-with col3:
-
-    st.metric(
-        "🔴 Manager Alerts",
-        manager_alerts
-    )
 
 
 # ----------------------------------
@@ -134,6 +128,8 @@ if st.button(
     st.session_state[
         "today_plan"
     ] = plan
+
+    st.rerun()
 
 
 # ----------------------------------
@@ -215,7 +211,7 @@ else:
 
 if "today_plan" in st.session_state:
 
-    st.subheader(
+    st.header(
         "🗓 Coach Schedule"
     )
 
@@ -249,11 +245,77 @@ if "today_plan" in st.session_state:
 """
                 )
 
-                st.info(
-                    session["reason"]
+                student_id = session["student_id"]
+
+                button_key = (
+                    f"prepare_btn_{student_id}"
                 )
 
-    st.divider()
+                brief_key = (
+                    f"brief_data_{student_id}"
+                )
+
+                if st.button(
+                    "📄 Prepare For Session",
+                    key=button_key
+                ):
+
+                    with st.spinner(
+                        "Preparing coach brief..."
+                    ):
+
+                        brief = run_brief_workflow(
+                            student_id
+                        )
+
+                        st.session_state[
+                            brief_key
+                        ] = brief
+
+                if brief_key in st.session_state:
+
+                    brief = st.session_state[
+                        brief_key
+                    ]
+
+                    st.markdown(
+    f"""
+### 👤 Student Snapshot
+
+{brief.get('student_snapshot', 'N/A')}
+
+---
+
+### 📝 Last Conversation Summary
+
+{brief.get('last_conversation_summary', 'N/A')}
+
+---
+
+### 💬 What Was Discussed
+
+{brief.get('what_was_discussed', 'N/A')}
+
+---
+
+### ✅ Decisions & Recommendations
+
+{brief.get('decisions_and_recommendations', 'N/A')}
+
+---
+
+### 🎯 Follow-Up Topics For Today
+
+{brief.get('follow_up_topics', 'N/A')}
+"""
+)
+
+                    st.divider()
+
+    
+    # -------------------------
+    # Deferred Students
+    # -------------------------
 
     st.subheader(
         "⏳ Deferred To Tomorrow"
@@ -281,7 +343,6 @@ Reason:
 {student['reason']}
 """
                 )
-    
 
 # ----------------------------------
 # Critical Signals
@@ -335,62 +396,4 @@ if not critical_found:
 
     st.success(
         "No critical signals."
-    )
-
-# ----------------------------------
-# Manager Alerts
-# ----------------------------------
-
-st.divider()
-
-st.header(
-    "🔴 Manager Alerts"
-)
-
-manager_found = False
-
-for row in signals:
-
-    actioned = (
-        row.get(
-            "actioned",
-            ""
-        )
-    )
-
-    if actioned == "Manager Notified":
-
-        manager_found = True
-
-        st.warning(
-            f"{row.get('student_id')} requires manager attention"
-        )
-
-        with st.expander(
-            "View Details"
-        ):
-
-            st.write(
-                f"Signal Type: {row.get('signal_type')}"
-            )
-
-            st.write(
-                f"Severity: {row.get('severity')}"
-            )
-
-            st.write(
-                f"Urgency: {row.get('urgency')}"
-            )
-
-            st.write(
-                row.get(
-                    "reason",
-                    ""
-                )
-            )
-
-if not manager_found:
-
-    st.success(
-        "No manager alerts."
     )
