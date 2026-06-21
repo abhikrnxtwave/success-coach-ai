@@ -5,6 +5,7 @@ gspread
 google-auth
 langchain
 langchain-openai
+langgraph
 langsmith
 chromadb==0.5.5
 sentence-transformers
@@ -15,3 +16,4 @@ mem0ai
 langchain-text-splitters
 google-api-python-client
 google-auth-oauthlib
+pydantic-settings
