@@ -1,11 +1,36 @@
 from mem0 import MemoryClient
 import os
 
-memory = MemoryClient(
-    api_key=os.getenv(
-        "MEM0_API_KEY"
+try:
+    import streamlit as st
+except ImportError:
+    st = None
+
+
+def get_memory_client():
+
+    api_key = None
+
+    # Streamlit Cloud
+    if st:
+        try:
+            api_key = st.secrets["MEM0_API_KEY"]
+        except Exception:
+            pass
+
+    # Local (.env)
+    if not api_key:
+        api_key = os.getenv("MEM0_API_KEY")
+
+    if not api_key:
+        raise ValueError(
+            "MEM0_API_KEY not found. "
+            "Add it to .env locally or Streamlit Secrets."
+        )
+
+    return MemoryClient(
+        api_key=api_key
     )
-)
 
 
 def save_memory(
@@ -14,8 +39,9 @@ def save_memory(
     session_summary
 ):
 
-    # Facts
+    memory = get_memory_client()
 
+    # Facts
     memory.add(
         messages=[
             {
@@ -30,7 +56,6 @@ def save_memory(
     )
 
     # Summary
-
     memory.add(
         messages=[
             {
@@ -45,20 +70,26 @@ def save_memory(
     )
 
 
+def search_memory(
+    query,
+    student_id
+):
 
-#Retrieve Memories from Mem0
-
-
-
-def search_memory(query, student_id):
+    memory = get_memory_client()
 
     results = memory.search(
         query=query,
         user_id=student_id
     )
+
     memory_text = ""
 
     for item in results:
-        memory_text += item.get("memory", "") + "\n"
+        memory_text += (
+            item.get(
+                "memory",
+                ""
+            ) + "\n"
+        )
 
     return memory_text
